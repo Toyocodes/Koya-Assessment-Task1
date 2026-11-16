@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Slot {
+  id       String    @id
+  provider String
+  start    DateTime  @db.Timestamptz(3)
+  end      DateTime  @db.Timestamptz(3)
+  bookings Booking[]
+
+  @@index([provider, start])
+  @@index([start])
+  @@map("slots")
+}
+
+model Booking {
+  id        String   @id
+  slotId    String   @map("slot_id")
+  name      String
+  email     String
+  status    String   @default("confirmed")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  slot      Slot     @relation(fields: [slotId], references: [id], onDelete: Cascade)
+
+  @@index([slotId])
+  @@index([email, createdAt, id])
+  @@map("bookings")
+}
+
+model IdempotencyRecord {
+  key          String   @id
+  requestHash  String   @map("request_hash")
+  statusCode   Int      @map("status_code")
+  responseBody Json     @map("response_body")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@map("idempotency_records")
+}
+
+model BookingAttempt {
+  id        BigInt   @id @default(autoincrement())
+  email     String
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@index([email, createdAt])
+  @@map("booking_attempts")
+}
