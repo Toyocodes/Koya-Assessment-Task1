@@ -7,9 +7,9 @@ import type { ApiResponse, Booking, BookingPage } from "@/lib/types";
 function friendlyBookingError(response: Extract<ApiResponse<Booking>, { ok: false }>): string {
   switch (response.status) {
     case 409:
-      return "Someone has just booked this slot. Please choose another time.";
+      return "Someone booked this time just before you. Please choose another slot.";
     case 404:
-      return "This slot no longer exists. Please refresh and choose another time.";
+      return "This slot has been removed. Please choose another time.";
     case 429:
       return `Too many booking attempts for this email. Please try again in ${response.retryAfter ?? 60} seconds.`;
     default:

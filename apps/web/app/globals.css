@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -29,23 +30,23 @@
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.985 0.002 197);
-  --foreground: oklch(0.2 0.02 230);
+  --background: oklch(0.99 0.004 350);
+  --foreground: oklch(0.22 0.025 345);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.02 230);
-  --primary: oklch(0.5 0.1 190);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.955 0.01 197);
-  --secondary-foreground: oklch(0.25 0.03 220);
-  --muted: oklch(0.96 0.006 197);
-  --muted-foreground: oklch(0.5 0.02 230);
-  --accent: oklch(0.94 0.03 190);
-  --accent-foreground: oklch(0.3 0.06 200);
+  --card-foreground: oklch(0.22 0.025 345);
+  --primary: oklch(0.52 0.21 356);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.015 352);
+  --secondary-foreground: oklch(0.3 0.06 352);
+  --muted: oklch(0.967 0.01 350);
+  --muted-foreground: oklch(0.5 0.03 345);
+  --accent: oklch(0.948 0.035 354);
+  --accent-foreground: oklch(0.42 0.17 356);
   --destructive: oklch(0.58 0.22 27);
   --success: oklch(0.55 0.13 155);
-  --border: oklch(0.91 0.01 210);
-  --input: oklch(0.88 0.01 210);
-  --ring: oklch(0.6 0.1 190);
+  --border: oklch(0.92 0.016 350);
+  --input: oklch(0.89 0.02 350);
+  --ring: oklch(0.62 0.19 356);
 }
 
 @layer base {

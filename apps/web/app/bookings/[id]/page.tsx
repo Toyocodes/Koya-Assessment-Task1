@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CircleCheck } from "lucide-react";
 import { CancelBookingButton } from "@/components/cancel-booking-button";
 import { ServiceError } from "@/components/service-error";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,15 +19,8 @@ function Detail({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export default async function BookingPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ new?: string }>;
-}) {
+export default async function BookingPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { new: isNew } = await searchParams;
 
   const [bookingResponse, slotsResponse] = await Promise.all([fetchBooking(id), fetchSlots()]);
 
@@ -47,14 +38,6 @@ export default async function BookingPage({
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      {isNew && isConfirmed ? (
-        <Alert variant="success">
-          <CircleCheck />
-          <AlertTitle>You&apos;re booked!</AlertTitle>
-          <AlertDescription>Your appointment is confirmed. Keep your booking reference handy.</AlertDescription>
-        </Alert>
-      ) : null}
-
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-4">

@@ -1,24 +1,33 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { CalendarClock, CircleAlert, Loader2, UserRound } from "lucide-react";
 import { bookSlotAction } from "@/app/actions";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatDay, formatTimeRange } from "@/lib/format";
 import type { Slot } from "@/lib/types";
 
-export function BookingForm({ slot, onCancel }: { slot: Slot; onCancel: () => void }) {
-  const router = useRouter();
+type BookingFormProps = {
+  slot: Slot;
+  onPendingChange: (pending: boolean) => void;
+  onBooked: (bookingId: string) => void;
+  onUnavailable: (message: string) => void;
+  onCancel: () => void;
+};
+
+export function BookingForm({ slot, onPendingChange, onBooked, onUnavailable, onCancel }: BookingFormProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const attempt = useRef<{ signature: string; key: string } | null>(null);
+
+  useEffect(() => {
+    onPendingChange(isPending);
+  }, [isPending, onPendingChange]);
 
   function idempotencyKeyFor(signature: string): string {
     if (attempt.current?.signature !== signature) {
@@ -43,79 +52,75 @@ export function BookingForm({ slot, onCancel }: { slot: Slot; onCancel: () => vo
     startTransition(async () => {
       const result = await bookSlotAction({ slotId: slot.id, name: trimmedName, email: trimmedEmail, idempotencyKey });
       if (result.ok) {
-        router.push(`/bookings/${result.bookingId}?new=1`);
+        onBooked(result.bookingId);
+        return;
+      }
+      if (result.status === 409 || result.status === 404) {
+        onUnavailable(result.error);
         return;
       }
       setError(result.error);
-      if (result.status === 409 || result.status === 404) {
-        router.refresh();
-      }
     });
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Confirm your appointment</CardTitle>
-        <CardDescription>Enter your details to book this time.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="space-y-2 rounded-lg bg-muted p-4 text-sm">
-          <p className="flex items-center gap-2 font-medium">
-            <UserRound className="size-4 text-primary" />
-            {slot.provider}
-          </p>
-          <p className="flex items-center gap-2 text-muted-foreground">
-            <CalendarClock className="size-4 text-primary" />
-            {formatDay(slot.start)}, {formatTimeRange(slot.start, slot.end)}
-          </p>
+    <div className="space-y-5">
+      <div className="space-y-2 rounded-lg bg-accent/60 p-4 text-sm">
+        <p className="flex items-center gap-2 font-medium">
+          <UserRound className="size-4 text-primary" />
+          {slot.provider}
+        </p>
+        <p className="flex items-center gap-2 text-muted-foreground">
+          <CalendarClock className="size-4 text-primary" />
+          {formatDay(slot.start)}, {formatTimeRange(slot.start, slot.end)}
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <div className="space-y-2">
+          <Label htmlFor="name">Full name</Label>
+          <Input
+            id="name"
+            autoComplete="name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Ada Obi"
+            disabled={isPending}
+            autoFocus
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="ada@example.com"
+            disabled={isPending}
+            required
+          />
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="name">Full name</Label>
-            <Input
-              id="name"
-              autoComplete="name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Ada Obi"
-              disabled={isPending}
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="ada@example.com"
-              disabled={isPending}
-              required
-            />
-          </div>
+        {error ? (
+          <Alert variant="destructive">
+            <CircleAlert />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
 
-          {error ? (
-            <Alert variant="destructive">
-              <CircleAlert />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          ) : null}
-
-          <div className="flex gap-2">
-            <Button type="submit" className="flex-1" disabled={isPending}>
-              {isPending ? <Loader2 className="animate-spin" /> : null}
-              {isPending ? "Booking…" : "Book appointment"}
-            </Button>
-            <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
-              Back
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+        <div className="flex flex-col-reverse gap-2 sm:flex-row">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>
+            Back
+          </Button>
+          <Button type="submit" className="flex-1" disabled={isPending}>
+            {isPending ? <Loader2 className="animate-spin" /> : null}
+            {isPending ? "Booking…" : "Book appointment"}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }
