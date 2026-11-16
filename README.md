@@ -12,13 +12,13 @@ The API follows the contract in [docs/openapi.json](docs/openapi.json). It cover
 | Web (`apps/web`) | Next.js 15 (App Router, server actions), Tailwind CSS v4, shadcn/ui |
 | Database | PostgreSQL on Supabase |
 | Hosting | API on Render (`render.yaml`), web on Vercel |
-| Keep-alive | GitHub Actions workflow pinging every 10 minutes |
+| Keep-alive | cron-job.org pinging `/health` every 5 minutes |
 
 npm workspaces put both apps in one repository.
 
 ## Endpoints
 
-Every request needs the `X-API-Key` header. Every error response is `{"error": "<message>"}`.
+Every endpoint except `/health` needs the `X-API-Key` header. Every error response is `{"error": "<message>"}`.
 
 | Method | Path | Level | Notes |
 | --- | --- | --- | --- |
@@ -28,7 +28,7 @@ Every request needs the `X-API-Key` header. Every error response is `{"error": "
 | GET | `/bookings/:id` | 1 | 200 / 404 |
 | DELETE | `/bookings/:id` | 3 | 200 / 404 / 409 |
 | GET | `/bookings?email=&limit=&cursor=` | 4 | Cursor pagination, oldest first |
-| GET | `/health` | n/a | Open health check, used by Render and the keep-alive pinger |
+| GET | `/health` | n/a | Public health check that also runs `SELECT 1` on the database. Used by Render and the keep-alive cron job |
 
 ## API structure (NestJS)
 
@@ -60,7 +60,7 @@ apps/api/src
 CREATE UNIQUE INDEX bookings_one_confirmed_per_slot ON bookings (slot_id) WHERE status = 'confirmed';
 ```
 
-A booking is inserted with `INSERT ... ON CONFLICT (slot_id) WHERE status = 'confirmed' DO NOTHING RETURNING ...`. If no row comes back, the slot is taken and the API returns 409. Postgres settles the race, so only one request can win, even across many API instances. Cancelling is a single conditional `UPDATE ... WHERE status = 'confirmed'`, so a second cancel returns 409. Cancelled bookings are not covered by the index, which frees the slot.
+A booking is inserted with `INSERT ... ON CONFLICT (slot_id) WHERE status = 'confirmed' DO NOTHING RETURNING ...`. If no row comes back, the slot is taken and the API returns 409. Postgres settles the race, so only one request can win. In testing, 25 simultaneous bookings for one slot produced exactly one 201 and 24 409s. Cancelling is a single conditional `UPDATE ... WHERE status = 'confirmed'`, so a second cancel returns 409. Cancelled bookings are not covered by the index, which frees the slot.
 
 **Level 4: idempotency and paging.** When an `Idempotency-Key` is sent, the request takes a Postgres transaction-level advisory lock on that key, so simultaneous retries queue up instead of racing. The first request stores a SHA-256 hash of the canonical request body together with the status code and response. A later request with the same key and the same body gets the stored response back: same status and same booking id. The same key with a different body returns 422. Responses with 429 are not stored, so a retry after the limit lifts still goes through.
 
@@ -72,8 +72,8 @@ Order of checks in `POST /bookings`: API key → idempotency replay → rate lim
 
 ## Web page
 
-- `/`: upcoming slots grouped by day, a filter by doctor, and booking from a side panel.
-- `/bookings/:id`: the confirmation page with details and a cancel button.
+- `/`: upcoming slots grouped by day, with a filter by doctor. Clicking an open slot opens a booking modal. After a successful booking, the modal closes, a "Booking successful" toast shows, and the confirmation page opens. If someone else took the slot first, an "Oops" modal explains and asks you to pick another time.
+- `/bookings/:id`: the confirmation page with the booking details. Cancelling asks for confirmation in a modal, then shows a "cancelled successfully" toast.
 - `/my-bookings`: look up bookings by email, with a "Load more" button that uses the cursor.
 
 The browser never sees the API key. Pages and server actions call the API from the Next.js server using `API_URL` and `API_KEY` from the environment. Each booking submission sends an `Idempotency-Key`, and a retry of the same details reuses it, so a double click or a network retry cannot book twice.
@@ -92,12 +92,14 @@ npm run dev:web
 
 Fill in the Supabase connection strings and an API key first. The web app's `API_KEY` must match the API's.
 
-The end-to-end check runs every level against a running API. It calls `/reset`, so it wipes existing data:
+The end-to-end check script ([apps/api/scripts/check.ts](apps/api/scripts/check.ts)) runs 53 checks across all five levels, including the concurrency tests. It calls `/reset`, so it wipes existing data. Run `npm run db:seed` afterwards to load the demo slots again.
 
 ```bash
 npm run check -w apps/api
 CHECK_API_URL=https://your-api.onrender.com npm run check -w apps/api
 ```
+
+All 53 checks pass against the deployed API.
 
 ## Deployment
 
@@ -117,4 +119,4 @@ The API runs on Render and the web page runs on Vercel.
 
 **Keep-alive**
 
-Render's free services sleep after about 15 minutes without traffic. In GitHub, go to **Settings → Secrets and variables → Actions → Variables** and add `API_URL`. The workflow in `.github/workflows/keep-alive.yml` then pings `/health` every 10 minutes. Vercel doesn't sleep, so only the API needs pinging. One always-on service stays within Render's 750 free instance hours a month.
+Render's free services sleep after about 15 minutes without traffic, and free Supabase projects pause after a week without database activity. A cron-job.org job calls `/health` every 5 minutes. That keeps the Render API awake, and because `/health` runs `SELECT 1`, it also keeps the database active. Vercel doesn't sleep, so the web page needs nothing. One always-on service stays within Render's 750 free instance hours a month.
